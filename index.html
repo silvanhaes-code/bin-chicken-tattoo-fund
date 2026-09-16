@@ -46,6 +46,7 @@
         <img class="bar-bird" id="bar-bird" src="assets/bin-chicken.svg" alt="" aria-hidden="true" />
       </div>
       <p class="bar-caption" id="bar-caption">Nobody has chipped in yet. Be the first bin chicken.</p>
+      <p class="sync" id="sync" data-state="local" role="status" aria-live="polite">Connecting…</p>
 
       <div class="chooks" id="chooks" aria-hidden="true"></div>
     </section>
@@ -60,7 +61,8 @@
 
     <section class="card" aria-labelledby="people-title">
       <h2 id="people-title">Who's chipping in</h2>
-      <p class="hint">11 spots. Tap a name to change it, then put in what you're good for.</p>
+      <p class="hint">11 spots, shared by everyone with the link. Tap a name to change it,
+        then put in what you're good for — it saves itself.</p>
       <ul class="people" id="people"></ul>
       <div class="row-actions">
         <button type="button" class="ghost" id="split-even">Split evenly · $18.18 each</button>
@@ -69,7 +71,7 @@
     </section>
 
     <footer class="foot">
-      <p>Pledges are saved on this phone only — it's an honesty box, not a bank.</p>
+      <p>An honesty box, not a bank — no money changes hands here.</p>
       <p>Add to Home Screen for the full bin chicken experience.</p>
     </footer>
   </div>

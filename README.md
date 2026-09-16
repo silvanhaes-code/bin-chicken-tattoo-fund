@@ -15,8 +15,31 @@ one bin chicken tattoo on Josh's ankle.**
   ($18.19 × 2 + $18.18 × 9 = exactly $200).
 - **Goal reached** → the bird does a little jig and the app says so. Overshoot
   and it tells you how far over you are.
-- **Saved on the phone.** Pledges live in `localStorage`. It's an honesty box
-  for tracking who's in, not a payment system — no money changes hands here.
+- **Shared between everyone.** Pledges live in a Supabase table, so every edit
+  is saved and shows up on the other mates' phones within a few seconds. Edits
+  made with no signal are kept on the device and pushed up automatically once
+  the phone is back online.
+- It's an honesty box for tracking who's in, not a payment system — no money
+  changes hands here.
+
+## Connecting the shared list
+
+The app needs one free Supabase project to keep everyone's pledges in.
+
+1. Create a project at [supabase.com](https://supabase.com) (free tier is plenty).
+2. Open **SQL Editor**, paste in [`supabase/schema.sql`](supabase/schema.sql) and
+   run it. That creates the `pledges` table with the 11 fixed spots and the row
+   level security policies.
+3. In **Project Settings → API**, copy the **Project URL** and the **anon public**
+   key into [`js/config.js`](js/config.js).
+
+Both values are browser keys and are meant to be public; what protects the data
+is the RLS policy, which allows reading and updating the 11 existing rows and
+nothing else — no inserts, no deletes, no access to anything else in the project.
+Anyone with the link can edit the list, which is rather the point.
+
+With `js/config.js` left blank the app still runs, saving pledges on the device
+only, and says so.
 
 ## Install it on an iPhone
 
@@ -32,7 +55,10 @@ tattooed ankle) is hand-drawn SVG.
 ```
 index.html              The app
 css/app.css             Styles (light + dark)
-js/app.js               Pledges, totals, progress, storage
+js/app.js               UI, totals, progress, sync loop
+js/store.js             Shared Supabase store + on-device mirror
+js/config.js            Your Supabase project URL and anon key
+supabase/schema.sql     Table, seed rows and RLS policies
 assets/bin-chicken.svg  The bin chicken (Australian white ibis)
 assets/ankle-tattoo.svg The ankle, wearing the tattoo
 assets/icon*.png|svg    App icons

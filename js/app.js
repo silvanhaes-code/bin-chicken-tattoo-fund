@@ -1,13 +1,12 @@
 // Josh's Bin Chicken Tattoo Fund — 11 mates, $200 AUD, one ankle.
-const GOAL = 200;
-const SPOTS = 11;
-const STORAGE_KEY = "bin-chicken-fund-v1";
-const MAX_PLEDGE = 1000;
+import {
+  SPOTS, isShared, cleanAmount, cleanName,
+  readLocal, writeLocal, readPending, writePending, fetchAll, savePledge,
+} from "./store.js";
 
-const DEFAULT_NAMES = [
-  "Josh", "Mate 2", "Mate 3", "Mate 4", "Mate 5", "Mate 6",
-  "Mate 7", "Mate 8", "Mate 9", "Mate 10", "Mate 11",
-];
+const GOAL = 200;
+const POLL_MS = 4000;      // how often we ask the server what everyone else did
+const WRITE_DEBOUNCE = 500; // how long we wait after typing before saving
 
 const el = {
   people: document.getElementById("people"),
@@ -20,46 +19,25 @@ const el = {
   barBird: document.getElementById("bar-bird"),
   caption: document.getElementById("bar-caption"),
   chooks: document.getElementById("chooks"),
+  sync: document.getElementById("sync"),
   splitEven: document.getElementById("split-even"),
   reset: document.getElementById("reset"),
   toast: document.getElementById("toast"),
 };
 
-const money = (n) =>
-  "$" + (Number.isInteger(n) ? String(n) : n.toFixed(2));
-
-function blankState() {
-  return DEFAULT_NAMES.map((name) => ({ name, amount: 0 }));
-}
-
-function load() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (!Array.isArray(raw)) return blankState();
-    return blankState().map((slot, i) => ({
-      name: typeof raw[i]?.name === "string" && raw[i].name.trim() ? raw[i].name : slot.name,
-      amount: clamp(Number(raw[i]?.amount)),
-    }));
-  } catch {
-    return blankState();
-  }
-}
-
-function save() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(people));
-  } catch {
-    /* private mode / full storage — the app still works for this session */
-  }
-}
-
-function clamp(value) {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  return Math.min(Math.round(value * 100) / 100, MAX_PLEDGE);
-}
-
-let people = load();
+let people = readLocal();
 let celebrated = total() >= GOAL;
+
+// Rows the server must not overwrite yet: someone is typing in them, or their
+// edit hasn't been saved.
+const pending = readPending(); // id -> {name?, amount?}, survives a reload
+const writeTimers = new Map();
+let editing = null;          // id of the row with focus
+let saving = 0;
+let lastSyncedAt = 0;
+let syncError = null;
+
+const money = (n) => "$" + (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
 function total() {
   return Math.round(people.reduce((sum, p) => sum + p.amount, 0) * 100) / 100;
@@ -93,6 +71,18 @@ function buildRows() {
     .join("");
 }
 
+// Push state into the inputs, leaving alone whatever the viewer is typing in.
+function syncInputs() {
+  [...el.people.children].forEach((li, i) => {
+    if (editing === i) return;
+    const name = li.querySelector(".name");
+    const amount = li.querySelector(".amount");
+    const wanted = people[i].amount ? String(people[i].amount) : "";
+    if (name.value !== people[i].name) name.value = people[i].name;
+    if (amount.value !== wanted) amount.value = wanted;
+  });
+}
+
 function render() {
   const raised = total();
   const togo = Math.round(Math.max(GOAL - raised, 0) * 100) / 100;
@@ -114,10 +104,11 @@ function render() {
   [...el.chooks.children].forEach((chook, i) => {
     chook.classList.toggle("on", people[i].amount > 0);
   });
-
   [...el.people.children].forEach((li, i) => {
     li.classList.toggle("paid", people[i].amount > 0);
   });
+
+  renderSync();
 
   if (raised >= GOAL && !celebrated) {
     celebrated = true;
@@ -141,12 +132,119 @@ function captionFor(raised, togo, chippedIn) {
   return `${who} — ${money(togo)} still to go, ${Math.round((raised / GOAL) * 100)}% of the way there.`;
 }
 
+function renderSync() {
+  if (!isShared) {
+    el.sync.textContent = "Saved on this phone only — no shared list connected yet.";
+    el.sync.dataset.state = "local";
+    return;
+  }
+  if (syncError) {
+    el.sync.textContent = pending.size
+      ? `Can't reach the shared list — ${pending.size === 1 ? "1 edit is" : pending.size + " edits are"} saved here and will go up when you're back online.`
+      : "Can't reach the shared list — showing the last version. Retrying…";
+    el.sync.dataset.state = "error";
+    return;
+  }
+  if (saving > 0 || pending.size) {
+    el.sync.textContent = "Saving…";
+    el.sync.dataset.state = "saving";
+    return;
+  }
+  el.sync.textContent = `Shared with all 11 — everyone's edits land here${
+    lastSyncedAt ? ", updated " + ago(lastSyncedAt) : ""
+  }.`;
+  el.sync.dataset.state = "ok";
+}
+
+function ago(when) {
+  const secs = Math.round((Date.now() - when) / 1000);
+  if (secs < 5) return "just now";
+  if (secs < 60) return `${secs}s ago`;
+  return `${Math.round(secs / 60)}m ago`;
+}
+
+/* ---------------- talking to the shared list ---------------- */
+
+function applyRemote(rows) {
+  let changed = false;
+  rows.forEach((row, i) => {
+    if (editing === i || pending.has(i)) return; // don't stomp on a live edit
+    if (people[i].name !== row.name || people[i].amount !== row.amount) {
+      people[i] = row;
+      changed = true;
+    }
+  });
+  lastSyncedAt = Date.now();
+  syncError = null;
+  if (changed) {
+    writeLocal(people);
+    syncInputs();
+  }
+  render();
+}
+
+async function pull() {
+  if (!isShared || document.hidden) return;
+  try {
+    applyRemote(await fetchAll());
+  } catch (err) {
+    syncError = err;
+    renderSync();
+  }
+}
+
+// Queue a change for one row and save it once the typing settles.
+function queueWrite(id, patch) {
+  pending.set(id, { ...(pending.get(id) || {}), ...patch });
+  writePending(pending);
+  writeLocal(people);
+  renderSync();
+
+  clearTimeout(writeTimers.get(id));
+  writeTimers.set(id, setTimeout(() => flush(id), WRITE_DEBOUNCE));
+}
+
+async function flush(id) {
+  const patch = pending.get(id);
+  if (!patch) return;
+  pending.delete(id);
+  writePending(pending);
+
+  if (!isShared) {
+    writeLocal(people);
+    renderSync();
+    return;
+  }
+
+  saving += 1;
+  renderSync();
+  try {
+    const row = await savePledge(id, patch);
+    if (editing !== id && row) {
+      people[id] = row;
+      syncInputs();
+    }
+    lastSyncedAt = Date.now();
+    syncError = null;
+    writeLocal(people);
+  } catch (err) {
+    syncError = err;
+    // Keep the edit queued so the next settle retries it.
+    pending.set(id, { ...patch, ...(pending.get(id) || {}) });
+    writePending(pending);
+    clearTimeout(writeTimers.get(id));
+    writeTimers.set(id, setTimeout(() => flush(id), 5000));
+  } finally {
+    saving -= 1;
+    render();
+  }
+}
+
 /* ---------------- interaction ---------------- */
 
 function parseAmount(text) {
   if (String(text).includes("-")) return 0; // no negative pledges, nice try
-  const cleaned = String(text).replace(/[^0-9.,]/g, "").replace(",", ".");
-  return clamp(parseFloat(cleaned));
+  return cleanAmount(String(text).replace(/[^0-9.,]/g, "").replace(",", "."));
 }
 
 el.people.addEventListener("input", (event) => {
@@ -156,26 +254,36 @@ el.people.addEventListener("input", (event) => {
 
   if (event.target.classList.contains("amount")) {
     people[i].amount = parseAmount(event.target.value);
-    save();
+    queueWrite(i, { amount: people[i].amount });
     render();
   } else if (event.target.classList.contains("name")) {
-    people[i].name = event.target.value;
-    save();
+    people[i].name = event.target.value.slice(0, 24);
+    queueWrite(i, { name: people[i].name });
   }
 });
 
-// Tidy the typed amount once the field is left (e.g. "12,5o" -> "12.5").
+el.people.addEventListener("focusin", (event) => {
+  const li = event.target.closest(".person");
+  if (li) editing = Number(li.dataset.index);
+});
+
+// Tidy the typed value once the field is left, and save straight away.
 el.people.addEventListener("focusout", (event) => {
   const li = event.target.closest(".person");
   if (!li) return;
   const i = Number(li.dataset.index);
+  editing = null;
 
   if (event.target.classList.contains("amount")) {
     event.target.value = people[i].amount ? String(people[i].amount) : "";
-  } else if (event.target.classList.contains("name") && !event.target.value.trim()) {
-    people[i].name = DEFAULT_NAMES[i];
-    event.target.value = DEFAULT_NAMES[i];
-    save();
+  } else if (event.target.classList.contains("name")) {
+    people[i].name = cleanName(event.target.value, i);
+    event.target.value = people[i].name;
+    queueWrite(i, { name: people[i].name });
+  }
+  if (pending.has(i)) {
+    clearTimeout(writeTimers.get(i));
+    flush(i);
   }
 });
 
@@ -185,29 +293,28 @@ el.people.addEventListener("keydown", (event) => {
 
 el.splitEven.addEventListener("click", () => {
   const cents = Math.floor((GOAL * 100) / SPOTS);
-  let remainder = GOAL * 100 - cents * SPOTS;
+  const remainder = GOAL * 100 - cents * SPOTS;
   people.forEach((person, i) => {
     person.amount = (cents + (i < remainder ? 1 : 0)) / 100;
+    queueWrite(i, { amount: person.amount });
   });
   syncInputs();
-  save();
   render();
   toast(`Split evenly — ${money(cents / 100)} each.`);
 });
 
 el.reset.addEventListener("click", () => {
-  if (!confirm("Clear every pledge and start again?")) return;
-  people.forEach((person) => (person.amount = 0));
+  const question = isShared
+    ? "Clear every pledge for everyone and start again?"
+    : "Clear every pledge and start again?";
+  if (!confirm(question)) return;
+  people.forEach((person, i) => {
+    person.amount = 0;
+    queueWrite(i, { amount: 0 });
+  });
   syncInputs();
-  save();
   render();
 });
-
-function syncInputs() {
-  [...el.people.children].forEach((li, i) => {
-    li.querySelector(".amount").value = people[i].amount ? String(people[i].amount) : "";
-  });
-}
 
 let toastTimer;
 function toast(message) {
@@ -217,8 +324,20 @@ function toast(message) {
   toastTimer = setTimeout(() => el.toast.classList.remove("show"), 2600);
 }
 
+/* ---------------- go ---------------- */
+
 buildRows();
 render();
+
+if (isShared) {
+  pending.forEach((_, id) => flush(id));
+  pull();
+  setInterval(pull, POLL_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pull();
+  });
+  window.addEventListener("online", pull);
+}
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

@@ -120,6 +120,26 @@ h2 { margin: 0 0 4px; font-size: 17px; }
 }
 .bar-caption { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
 
+.sync {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sync::before {
+  content: "";
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+.sync[data-state="ok"]::before { background: var(--green-soft); }
+.sync[data-state="saving"]::before { background: var(--amber); animation: pulse 1s ease-in-out infinite; }
+.sync[data-state="error"]::before { background: var(--danger); }
+@keyframes pulse { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .sync::before { animation: none; } }
+
 .chooks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
 .chooks img {
   width: 24px; height: 24px;

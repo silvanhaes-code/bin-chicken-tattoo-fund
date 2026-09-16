@@ -1,10 +1,12 @@
 // Bin Chicken Tattoo Fund — offline shell.
-const CACHE = "bin-chicken-v1";
+const CACHE = "bin-chicken-v2";
 const ASSETS = [
   "./",
   "index.html",
   "css/app.css",
   "js/app.js",
+  "js/store.js",
+  "js/config.js",
   "manifest.webmanifest",
   "assets/bin-chicken.svg",
   "assets/ankle-tattoo.svg",
