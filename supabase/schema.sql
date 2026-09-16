@@ -30,3 +30,10 @@ create policy "pledges are editable by anyone"
   using (true) with check (true);
 
 -- Deliberately no insert or delete policy.
+
+-- Expose this one table to the Data API. Needed if the project was created with
+-- "Automatically expose new tables" switched off (Supabase's own recommendation),
+-- and harmless if it was left on. Select and update only — the grants are a
+-- second lock on top of the policies above.
+grant usage on schema public to anon, authenticated;
+grant select, update on public.pledges to anon, authenticated;
