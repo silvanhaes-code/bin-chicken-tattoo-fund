@@ -18,7 +18,8 @@ const REQUEST_TIMEOUT = 8000;
 const MAX_PLEDGE = 1000;
 const MAX_NAME = 24;
 
-const base = String(SUPABASE_URL).replace(/\/+$/, "");
+// Accept either the bare project URL or one already pointing at the Data API.
+const base = String(SUPABASE_URL).trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
 export const isShared = Boolean(base && SUPABASE_ANON_KEY);
 
 const endpoint = `${base}/rest/v1/pledges`;

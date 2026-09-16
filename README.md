@@ -30,8 +30,10 @@ The app needs one free Supabase project to keep everyone's pledges in.
 2. Open **SQL Editor**, paste in [`supabase/schema.sql`](supabase/schema.sql) and
    run it. That creates the `pledges` table with the 11 fixed spots and the row
    level security policies.
-3. In **Project Settings → API**, copy the **Project URL** and the **anon public**
-   key into [`js/config.js`](js/config.js).
+3. In **Project Settings → API**, copy the **Project URL** and the **publishable**
+   key (labelled **anon public** on older projects) into
+   [`js/config.js`](js/config.js). Never the secret / service_role key — that one
+   bypasses every policy below.
 
 Both values are browser keys and are meant to be public; what protects the data
 is the RLS policy, which allows reading and updating the 11 existing rows and
