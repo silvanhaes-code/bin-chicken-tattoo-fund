@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Bin chicken (Australian white ibis)">
+  <!-- legs -->
+  <g fill="none" stroke="#2a2724" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M52 70 L49 87" />
+    <path d="M45 89 L49 87 L54 90" />
+    <path d="M64 69 L67 86" />
+    <path d="M63 88 L67 86 L72 89" />
+  </g>
+
+  <!-- scruffy black tail plumes -->
+  <path d="M72 44 C84 35 95 36 99 44 C91 42 83 45 78 50 C86 48 92 51 95 56 C87 53 79 56 74 61 Z" fill="#1b1b1b" />
+
+  <!-- neck (tucks behind the body) -->
+  <path d="M47 56 C40 46 35 36 32 27" fill="none" stroke="#1b1b1b" stroke-width="7.5" stroke-linecap="round" />
+
+  <!-- body -->
+  <path d="M36 57 C34 44 46 34 60 35 C74 36 83 44 83 55 C83 68 70 76 57 75 C44 74 37 68 36 57 Z"
+        fill="#fbf8f2" stroke="#4a4642" stroke-width="2.2" stroke-linejoin="round" />
+
+  <!-- folded wing -->
+  <path d="M44 51 C54 44 70 45 80 55" fill="none" stroke="#4a4642" stroke-width="1.8" stroke-linecap="round" />
+  <g fill="none" stroke="#c9c2b4" stroke-width="1.5" stroke-linecap="round">
+    <path d="M52 55 C58 52 66 53 72 58" />
+    <path d="M50 62 C57 59 65 60 71 65" />
+  </g>
+  <!-- black wing tip -->
+  <path d="M75 52 C81 54 84 58 85 62 C79 61 74 58 71 55 Z" fill="#1b1b1b" />
+
+  <!-- bald black head + long down-curved bill -->
+  <ellipse cx="30" cy="24" rx="7.2" ry="5.8" transform="rotate(-24 30 24)" fill="#1b1b1b" />
+  <path d="M25 21 C15 29 9 43 11 59 L15.5 58 C13.5 44 18 31 28 24 Z" fill="#1b1b1b" />
+  <circle cx="31" cy="22" r="1.5" fill="#fbf8f2" />
+</svg>
